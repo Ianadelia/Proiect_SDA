@@ -1,0 +1,254 @@
+---
+title: "Proiect Stiinta datelor in afaceri"
+subtitle: "Impactul diferitilor factori asupra tehnologiilor bazate pe containere -Dragomir Anca, Dragomir Gabriel, Dumittrescu Razvan, Iana Delia-Cristina"
+format: pdf
+editor: visual
+---
+
+Motivatia alegerii
+
+Stack Overflow annual Developer Survey este cea mai mare aplicatie de sondaje din lume ce include oameni care codeaza.
+
+În fiecare an, ei creaza un sondaj care include mai multe topice, de la tehnologiile preferate ale dezvoltatorilor, pana la preferințele lor profesionale. Anul 2022 marchează al unsprezeceleaan în care au fost publicat rezultatele anuale ale sondajului iar numarul persoanelor care participa creste de la an la an.
+
+In prezent, sunt disponibile multe opțiuni de filtrare utile, cum ar fi țara și sexul populatiei esantionului.
+
+Exista 3 domenii principale de pe urma carora utilizatorii pot beneficia:
+
+1.  Tehnologie - Pentru a identifica instrumentele utilizate în mod obișnuit (de exemplu,
+
+    limbaje și platforme de programare) și potențialul acestora. În plus, vom descoperi care
+
+    sunt cele mai indragite si dorite platforme ale momentului potrivit esantionului.
+
+2.  Salariu - Pentru a afla distribuția salarială a diferitelor tipuri de dezvoltatori și modul în
+
+    care acestea pot fi influențate de diplome și modul în care aceasta diferă de la o țară la
+
+    alta.
+
+3.  analiza jobului - Pentru a identifica factorii care influenteaza alegerea locurilui de muncă
+
+    și cum acesta diferă între bărbat și femeie și variază de la de la o țară la alta.
+
+    Problema pe care vrem sa o rezolvam
+
+    Sa se stabileasca, pentru un esantion de angajati din America de Nord, daca folosirea tehnologiilor bazate pe containere (docker / kubernetes) este influentata de:
+
+    \- categoria de generatie a respondentilor (BabyBoomers, Boomers, GenX, GenZ, Millenials);
+
+    \- dimensiunea organizatiei in cadrul careia lucreaza (small, medium, large);
+
+    \- posesia de cunostinte din domeniul cloud (YES / NO).
+
+    Datele modelului de regresie
+
+    Pentru date am ales site-ul [Stack Overflow Insights - Developer Hiring, Marketing, and User Research](https://insights.stackoverflow.com/survey), si anume fisierul csv survey_results_public cu datele din 2022.
+
+    Ce solutii au fost incercate de alti oameni
+
+    Problema pe care noi am incercat sa o rezolvam nu a fost aprofundata de cercetatori inca, insa Ang Wei Xuan Dion, David Chow Jing Shan, Peh Anqi au facut o analiza asupra rezultatelor obtinute din urma sondajului si o regresie care sa arate impactul experientei profesionale asupra salariului si pozitiei in cazul developerilor. Sursa de date: [IS428-Group3_DevBuzz_Research_Paper.pdf (smu.edu.sg)](https://wiki.smu.edu.sg/1920t2is428/img_auth.php/1/19/IS428-Group3_DevBuzz_Research_Paper.pdf)
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+
+#Initilizare setul de date.
+data_2022<-read.csv("C:\\Users\\Admin\\Desktop\\survey_results_public.csv", header=TRUE, sep=",")
+
+dim(data_2022)
+
+```
+
+Filtram respondentii angajati din America de Nord.
+
+```{r}
+library(dplyr)
+
+employed_statuses = c("Employed full-time",
+                      "Employed part-time",
+                      "Independent contractor, freelancer, or self-employed")
+
+selected_countries = c("United States of America", "Canada")
+
+
+data_2022 <- data_2022 %>%
+  filter(Employment %in% employed_statuses 
+         & Country %in% selected_countries)
+
+dim(data_2022)
+
+
+
+```
+
+```{r}
+#Calculam generatia din care face parte fiecare respondent intr-o variabila factor.
+
+library(dplyr)
+
+data_2022 <- data_2022 %>%
+  filter(Age!= "Prefer not to say") %>%
+  mutate("AgeGeneration" = as.factor(case_when(Age %in% c("55-64 years old", "65 years or older") ~ "Baby boomers",
+                                               Age %in% c("45-54 years old") ~ "Gen X",
+                                               Age %in% c("25-34 years old", "35-44 years old") ~ "Millennials",
+                                               Age %in% c("Under 18 years old", "18-24 years old") ~ "Gen Z",
+                                               TRUE ~ Age)))
+
+#Calculam nivelul organizatiei din care face parte fiecare respondent intr-o variabila factor.
+
+data_2022 <- data_2022 %>%
+  filter(!is.na(OrgSize) & OrgSize != "I donâ€™t know") %>%
+  mutate("OrganisationLevel" = as.factor(case_when(OrgSize %in% c("Just me - I am a freelancer, sole proprietor, etc.", "2 to 9 employees", "10 to 19 employees", "20 to 99 employees") ~ "Small",
+                                                   OrgSize %in% c("100 to 499 employees", "500 to 999 employees") ~ "Medium",
+                                                   OrgSize %in% c("1,000 to 4,999 employees", "5,000 to 9,999 employees", "10,000 or more employees") ~ "Large",
+                                                   TRUE ~ OrgSize)))
+
+#Calculam nr. de respondenti care poseda / nu poseda cunostinte din domeniul cloud intr-o variabila factor binara.
+
+data_2022 <- data_2022 %>%
+  mutate("CloudKnowledge" = as.factor(ifelse(!is.na(PlatformHaveWorkedWith), "YES", "NO")))
+
+#Calculam nr. de respondenti care au / nu au experienta cu tehnologiile bazate pe containere intr-o variabila factor binara (variabila explicata).
+
+data_2022 <- data_2022 %>%
+  mutate("ContainersExp" = as.factor(ifelse(grepl("Docker", ToolsTechHaveWorkedWith, fixed = TRUE) 
+                                            | grepl("Kubernetes", ToolsTechHaveWorkedWith, fixed = TRUE), "YES", "NO")))
+
+#Pastram doar coloanele necesare formularii ecuatiei de regresie logistica.
+
+data_2022 <- data_2022 %>%
+  select(AgeGeneration, OrgSize, OrganisationLevel, CloudKnowledge, ContainersExp)
+
+#Realizam sanity checks prin vizualizarea graficelor de distributie pentru variabilele explicative.
+
+library(cowplot)
+
+plot_AgeGeneration <-ggplot(data = data_2022, aes(x = AgeGeneration)) +
+  geom_bar()
+
+plot_OrganisationLevel <-ggplot(data = data_2022, aes(x = OrganisationLevel)) +
+  geom_bar()
+
+plot_CloudKnowledge <-ggplot(data = data_2022, aes(x = CloudKnowledge)) +
+  geom_bar()
+
+plot_ContainersExpl <-ggplot(data = data_2022, aes(x = ContainersExp)) +
+  geom_bar()
+
+
+plot_grid(plot_AgeGeneration, plot_OrganisationLevel, plot_CloudKnowledge, plot_ContainersExpl)
+
+```
+
+```{r}
+summary(data_2022 %>% 
+          select(c(AgeGeneration, OrganisationLevel, CloudKnowledge, ContainersExp)
+          ))
+```
+
+Nivelurile sunt destul de echilibrate in cadrul distributiilor, exceptie facand urmatoarele:
+
+\- generatia Milleanials care reprezinta aproximativ 65% din totalul respondentilor;
+
+\- numarul redus al respondentilor ce poseda cunostinte in domeniul cloud.
+
+Distributia raspunsurilor pentru variabila explicata este foarte echilibrata, constituind un puternic avantaj in calitatea modelului.
+
+```{r}
+summarise(data_2022)
+```
+
+```{r}
+logistical_regression <- glm(ContainersExp ~ AgeGeneration + OrganisationLevel + CloudKnowledge,
+                             data = data_2022,
+                             family="binomial"
+)
+
+summary(logistical_regression)
+```
+
+Se poate observa ca toate valorile variabilelor explicative sunt foarte semnificative din punct de vedere statistic, mai putin nivelul \~ Medium \~ ale companiilor la care sunt angajati respondentii. Se extrag urmatoarele concluzii din output-ul regresiei modelate:
+
+\- Se poate observa o puternica corespondenta inversa intre varsta (generatia) respondentilor si mediul de lucru cu tehnologii bazate pe containere (cu cat sunt mai tineri, cu atat sunt mai predispusi sa lucreze cu containere):
+
+a\) Gen X este cu 30.63% mai probabila decat generatia Baby Boomers de a avea experienta cu tehnologiile bazate pe containere;
+
+b\) Gen Z este cu 52.03% mai probabila decat generatia Baby Boomers de a avea experienta cu tehnologiile bazate pe containere;
+
+c\) Milleanials este cu 67.21% mai probabila decat generatia Baby Boomers de a avea experienta cu tehnologiile bazate pe containere.
+
+\- Se poate observa o corespondenta intre nivelul organizatiei si mediul de lucru cu tehnologii bazate pe containere:
+
+a\) Respondentii angajati in companii de nivel mediu sunt cu 5.009% mai probabili decat angajatii companiilor large sa lucreze cu tehnologii bazate pe containere (nesemnificativ stat.);
+
+b\) Respondentii angajati in companii de nivel mic sunt cu 16.82% mai putin probabili decat angajatii companiilor large sa lucreze cu tehnologii bazate pe containere;
+
+\- Se poate observa ca posesia de cunostinte in domeniul cloud mareste semnificativ sansa ca angajatii sa lucreze cu tehnologii bazate pe containere:
+
+a\) Respondentii care poseda cunostinte in domeniul cloud sunt de 1.46 ori mai probabili decat cei care nu poseda cunostinte in domeniul cloud sa lucreze cu tehnologii bazate pe containere.
+
+Calculam acuratetea modelului sugerat.
+
+```{r}
+fitted.results <- predict(logistical_regression, newdata = subset(data_2022, select = 
+                                                                    c(OrganisationLevel, AgeGeneration, CloudKnowledge)), type = 'response')
+fitted.results <- ifelse(fitted.results >= 0.5, "YES", "NO")
+misClasificError <- mean(fitted.results != data_2022$ContainersExp)
+print(paste('Accuracy', 1 - misClasificError))
+```
+
+Astfel, reiese o acuratete de 65.54%, o acuratete de nivel satisfacator pentru un model valid.
+
+```{r}
+
+install.packages("ROCR", repos = "http://cran.us.r-project.org")
+library(ROCR)
+yhat_regression <- predict(logistical_regression, type="response")
+prediction_regression <- prediction( yhat_regression, data_2022$ContainersExp)
+
+performance_regression <- performance(prediction_regression, "tpr", "fpr")
+plot(performance_regression, colorize = TRUE)
+```
+
+```{r}
+install.packages("ROCR", repos = "http://cran.us.r-project.org")
+library(ROCR)
+ auc_regression <- performance(prediction_regression, "auc") 
+print(paste('AOC', auc_regression@y.values))
+
+```
+
+Aria de sub curba ROC ocupa \~ 66.44% din suprafata totala, fapt ce indica ca am ales un clasificator mai bun decat unul aleator.
+
+O valoare a pragului probabilitatii de 0.5 ar conduce la o rata a clasificarii pozitive corecte de aproximativ 0.9 si la o rata a clasificarii pozitive false de aproximativ 0.55, fapt ce justifica alegerea acestui punct optim de probabilitate de pe curba ROC.
+
+```{r}
+
+install.packages("caret", repos = "http://cran.us.r-project.org")
+library(caret)
+confusionMatrix(factor(fitted.results), factor(data_2022$ContainersExp))
+```
+
+Senzitivitatea de 44.19% indica o acuratete modesta in predictia corecta a numarului de respondenti care au experienta cu tehnologiile bazate pe containere.
+
+Specificitatea de 83.62% indica o acuratete mult mai ridicata in ceea ce priveste predictia corecta a numarului de respondenti care nu au experienta cu tehnologiile bazate pe containere.
+
+Din matricea de confuzie se pot extrage urmatoarele date:
+
+\- true positive - 2628;
+
+\- false positive - 1065;
+
+\- true negative - 6119;
+
+\- false negative - 3552.
+
+In concluzie, modelul are performante relativ bune, insa nu optime. Acest fapt se datoreaza altor variabile explicative neincluse in model care pot influenta daca un angajat din America de Nord are sau nu are experienta cu tehnologiile bazate pe containere (docker / kubernetes). Variabilele explicative care ar fi putut face parte din model sunt experienta utilizatorilor (anii de cand codeaza/ varsta la care au scris primul cod), dar si tara unde locuiesc.
