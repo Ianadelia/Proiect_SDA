@@ -1,4 +1,5 @@
 # Proiect_SDA
+Studenti: Dragomir Anca, Dragomir Gabriel, Dumitrescu Razvan, Iana Delia-Cristina
 Am ales urmatoarea problema:
 Sa se stabileasca, pentru un esantion de angajati din America de Nord, daca folosirea
 tehnologiilor bazate pe containere (docker / kubernetes) este influentata de:
